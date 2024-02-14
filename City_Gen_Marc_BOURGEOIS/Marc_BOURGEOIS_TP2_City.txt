@@ -1,0 +1,155 @@
+import hou
+
+# Création d'un node de base
+obj_level = hou.node('obj')
+
+# Nettoyage de la scène
+for node in obj_level.children():
+    node.destroy()
+
+# BUILDING
+
+building = obj_level.createNode('geo', 'building')
+b_lsystem = building.createNode('lsystem', 'b_lsystem')
+b_lsystem.parm('stepinit').set(1)
+b_lsystem.parm('stepscale').set(1)
+b_lsystem.parm('angleinit').set(90)
+b_lsystem.parm('premise').set('A')
+b_lsystem.parm('rule1').set('A=F+A:0.5')
+b_lsystem.parm('rule2').set('A=F-A:0.5')
+
+b_transform = building.createNode('xform', 'b_transform')
+b_transform.parm('rx').set(-90)
+b_transform.setInput(0, b_lsystem)
+
+b_fuse = building.createNode('fuse::2.0')
+b_fuse.setInput(0, b_transform)
+
+b_polyframe = building.createNode('polyframe', 'b_polyframe')
+b_polyframe.parm('Non').set(False)
+b_polyframe.parm('tangentu').set('N')
+b_polyframe.setInput(0, b_fuse)
+b_polyframe.parm('style').set('edge1')
+
+b_grid = building.createNode('grid', 'b_grid')
+b_grid.parm('sizex').set(1)
+b_grid.parm('sizey').set(1)
+b_grid.parm('rows').set(2)
+b_grid.parm('cols').set(2)
+
+b_copy = building.createNode('copytopoints::2.0', 'b_copy')
+b_copy.setInput(0, b_grid)
+b_copy.setInput(1, b_polyframe)
+
+b_fuse2 = building.createNode('fuse::2.0', 'b_fuse2')
+b_fuse2.setInput(0, b_copy)
+
+b_polyextrude = building.createNode('polyextrude::2.0', 'b_polyextrude')
+b_polyextrude.parm('dist').set(3)
+b_polyextrude.parm('divs').set(3)
+b_polyextrude.setInput(0, b_fuse2)
+
+# Building body color
+b_color = building.createNode('attribrandomize', 'b_color')
+b_color.parm('minx').set(0.5)
+b_color.parm('maxx').set(0.8)
+b_color.parm('miny').set(0.5)
+b_color.parm('maxy').set(0.5)
+b_color.parm('minz').set(0.5)
+b_color.parm('maxz').set(0.5)
+b_color.setInput(0, b_polyextrude)
+
+
+# Roof
+b_polyexpand2d = building.createNode('polyexpand2d', 'b_polyexpand2d')
+b_polyexpand2d.setInput(0, b_fuse2)
+
+b_polyextrude2 = building.createNode('polyextrude::2.0', 'b_polyextrude2')
+b_polyextrude2.parm('dist').set(0.1)
+b_polyextrude2.setInput(0, b_polyexpand2d)
+
+b_transform2 = building.createNode('xform', 'b_transform2')
+b_transform2.parm('ty').set(3)
+b_transform2.setInput(0, b_polyextrude2)
+
+# Roof color
+b_roof_color = building.createNode('attribrandomize', 'b_roof_color')
+b_roof_color.parm('minx').set(0.25)
+b_roof_color.parm('maxx').set(0.75)
+b_roof_color.parm('miny').set(0.1)
+b_roof_color.parm('maxy').set(0.2)
+b_roof_color.parm('minz').set(0.1)
+b_roof_color.parm('maxz').set(0.2)
+b_roof_color.setInput(0, b_transform2)
+
+# Merge building parts
+b_merge = building.createNode('merge', 'b_merge')
+b_merge.setInput(0, b_color)
+b_merge.setInput(1, b_roof_color)
+
+# BUILDING Output
+b_output = building.createNode('null', 'BUILDING')
+b_output.setInput(0, b_merge)
+
+# Multiply buildings
+bm_grid = building.createNode('grid', 'bm_grid')
+bm_grid.parm('sizex').set(20)
+bm_grid.parm('sizey').set(20)
+bm_grid.parm('rows').set(2)
+bm_grid.parm('cols').set(2)
+
+bm_scatter = building.createNode('scatter::2.0', 'bm_scatter')
+bm_scatter.parm('npts').set(20)
+bm_scatter.setInput(0, bm_grid)
+
+bm_attribrand1 = building.createNode('attribrandomize', 'bm_attribrand1')
+bm_attribrand1.parm('name').set('N')
+bm_attribrand1.parm('minx').set('-1')
+bm_attribrand1.parm('maxx').set('1')
+bm_attribrand1.parm('miny').set('0')
+bm_attribrand1.parm('maxy').set('0')
+bm_attribrand1.parm('minz').set('-1')
+bm_attribrand1.parm('maxz').set('1')
+bm_attribrand1.setInput(0, bm_scatter)
+
+bm_attribrand2 = building.createNode('attribrandomize', 'bm_attribrand2')
+bm_attribrand2.parm('name').set('Cd')
+bm_attribrand2.setInput(0, bm_attribrand1)
+
+bm_copy = building.createNode('copytopoints::2.0', 'bm_copy')
+bm_copy.setInput(0, b_output)
+bm_copy.setInput(1, bm_attribrand2)
+
+# TERRAIN
+m_grid = building.createNode('grid')
+m_grid.parm('sizex').set('30')
+m_grid.parm('sizey').set('30')
+m_grid.parm('rows').set('60')
+m_grid.parm('cols').set('60')
+
+m_mountain = building.createNode('attribnoise::2.0', 'm_moutain')
+m_mountain.parm('amplitude').set(1)
+m_mountain.parm('attribs').set('P')
+m_mountain.setInput(0, m_grid)
+
+# Colorize terrain
+m_color = building.createNode('attribrandomize', 'm_color')
+m_color.parm('dimensions').set(3)
+m_color.parm('maxx').set(0)
+m_color.parm('maxy').set(1)
+m_color.parm('maxz').set(0.3)
+m_color.setInput(0, m_mountain)
+
+# Merge buildings and terrain
+m_merge = building.createNode('merge', 'm_merge')
+m_merge.setInput(0, bm_copy)
+m_merge.setInput(1, m_color)
+
+# Display final output
+bm_output = building.createNode('null', 'OUTPUT')
+bm_output.setInput(0, m_merge)
+bm_output.setDisplayFlag(True)
+bm_output.setRenderFlag(True)
+
+obj_level.layoutChildren()
+building.layoutChildren()
